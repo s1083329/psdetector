@@ -103,28 +103,6 @@ class GraphTheoryDetector(detector):
         Args:
         Returns:
         '''
-        '''
-        if self.training:
-            dataset=pd.read_csv(labelpath)
-            newdata=[]
-            label=[]
-            for i in data:
-                newdata.append(i[1:])
-                label.append(dataset[(dataset["filename"]==i[0])][['label','CPU Architecture']])
-            label=np.array(label)
-            label=label.reshape(len(all),2)
-            remaining_data,filtered_elements=vet.df_se(data)
-            self.max_length=max(len(s) for s in remaining_data)
-            slf_vector=[]
-            for string in remaining_data:
-                slf_vector.append(vet.slf(string,self.max_length))
-            slf_vector=np.array(slf_vector)
-            psi_vector=vet.psi(remaining_data)
-            df_vector=vet.DFrank(psi_vector,label)
-            unique_data,sele_vector=vet.se(df_vector,psi_vector,filtered_elements)
-            X_selected,X_selected_names=vet.rfe(sele_vector,label,unique_data)
-            feature=np.column_stack((X_selected,slf_vector))
-        '''
         if not self.training:
             with open("filtered_elements.pickle", 'rb') as pickle_file:
                 filtered_elements = pickle.load(pickle_file)
