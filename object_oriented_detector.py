@@ -5,8 +5,6 @@ import pickle
 import r2pipe
 from joblib import load, dump
 from malwareDetector.detector import detector
-# from utils import parameter_parser
-# from utils import write_output
 import os
 import time
 import pandas as pd
