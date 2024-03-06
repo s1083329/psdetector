@@ -6,6 +6,8 @@ import r2pipe
 from joblib import load, dump
 import joblib
 from malwareDetector.detector import detector
+# from utils import parameter_parser
+# from utils import write_output
 import os
 import time
 import pandas as pd
@@ -13,8 +15,7 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_validate
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.neural_network 
-import MLPClassifier
+from sklearn.neural_network import MLPClassifier
 
 
 class GraphTheoryDetector(detector):
