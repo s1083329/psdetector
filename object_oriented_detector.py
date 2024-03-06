@@ -13,7 +13,8 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_validate
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.neural_network import MLPClassifier
+from sklearn.neural_network 
+import MLPClassifier
 
 
 class GraphTheoryDetector(detector):
