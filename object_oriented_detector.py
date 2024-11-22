@@ -5,7 +5,7 @@ import pickle
 import r2pipe
 from joblib import load, dump
 import joblib
-from malwareDetector.detector import detector
+#from malwareDetector.detector import detector
 # from utils import parameter_parser
 # from utils import write_output
 import os
@@ -16,9 +16,10 @@ from sklearn.model_selection import cross_validate
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
+from scipy.sparse import csr_matrix, hstack
 
 
-class GraphTheoryDetector(detector):
+class GraphTheoryDetector():
     def __init__(self, model_name_or_path: str = '', task_type: str = 'detection', training: bool = False, max_length=783265) -> None:
         self.model_name_or_path = model_name_or_path
         self.task_type = task_type
@@ -42,7 +43,14 @@ class GraphTheoryDetector(detector):
             '''with open(model_name_or_path, 'rb') as pickle_file:
                 self.model = pickle.load(pickle_file)'''
 
-    def extractFeature(self, fpath_1: str = '', fpath_2: str = '', labelpath: str = '') -> np.array:
+    def get_filepaths(self, fpath: str = '') -> list:
+        file_paths = []
+        for root, _, files in os.walk(fpath):
+            for file in files:
+                file_paths.append(os.path.join(root, file))
+        return file_paths
+
+    def extractFeature(self, fpath: str = '', labelpath: str = '') -> np.array:
         '''
         Extract features from a binary file using the radare2 library.
 
@@ -52,56 +60,45 @@ class GraphTheoryDetector(detector):
         Returns:
             np.data: A tw-dim string array.
         '''
+        # Load the CSV file
+        label = pd.read_csv(labelpath)
+        # Create a list to store the generated file paths
+        file_paths = self.get_filepaths(fpath)
+        newlabel=[]
         data = []
         filenum_1 = 0
-        filenum_2 = 0
-        for root, _, files in os.walk(fpath_1):
-            file_list = [f for f in os.listdir(
-                root) if os.path.isfile(os.path.join(root, f))]
-            for file_name in file_list:
-                if filenum_1 == 5000:
-                    break
-                file_path = os.path.join(root, file_name)
-                r2 = r2pipe.open(file_path)
-                result = r2.cmd("izzj")
-                string = []
-                string.append(file_name)
-                json_obj = json.loads(result)
-                for jsonfile in json_obj:
-                    string.append(jsonfile["string"])
-                data.append(string)
-                filenum_1 = filenum_1+1
-        for root, _, files in os.walk(fpath_2):
-            file_list = [f for f in os.listdir(
-                root) if os.path.isfile(os.path.join(root, f))]
-            for file_name in file_list:
-                if filenum_2 == 5000:
-                    break
-                file_path = os.path.join(root, file_name)
-                r2 = r2pipe.open(file_path)
-                result = r2.cmd("izzj")
-                string = []
-                string.append(file_name)
-                json_obj = json.loads(result)
-                for jsonfile in json_obj:
-                    string.append(jsonfile["string"])
-                data.append(string)
-                filenum_2 = filenum_2+1
+        for file_name in file_paths:
+            if filenum_1 == 500:
+                #break
+                pass
+            r2 = r2pipe.open(file_name)
+            result = r2.cmd("izzj")
+            string = []
+            #string.append(file_name.split('/')[-1])
+            json_obj = json.loads(result)
+            for jsonfile in json_obj:
+                string.append(jsonfile["string"])
+            data.append(string)
+            filenum_1 = filenum_1+1
+            newlabel.append(label[label['file_name']==file_name.split('/')[-1]][['family', 'CPU']])
         # print(self.trained)
         if self.training == False:
             return data
         if self.training:
             if self.trained == False:
-                dataset = pd.read_csv(labelpath)
-                newdata = []
-                label = []
-                for i in data:
-                    newdata.append(i[1:])
-                    label.append(dataset[(dataset["filename"] == i[0])][[
-                        'label', 'CPU Architecture']])
-                label = np.array(label)
-                label = label.reshape(len(newdata), 2)
-                remaining_data, filtered_elements = vet.df_se(newdata)
+                #dataset = pd.read_csv(labelpath)
+                #newdata = []
+                #label = []
+                #for i in data:
+                #    newdata.append(i[1:])
+                #    label.append(dataset[(dataset["filename"] == i[0])][[
+                #        'label', 'CPU Architecture']])
+                #label = np.array(label)
+                #label = label.reshape(len(newdata), 2)
+                newlabel = np.array(newlabel)
+                label = newlabel
+                label=label.reshape(len(data),2)
+                remaining_data, filtered_elements = vet.df_se(data)
                 self.max_length = max(len(s) for s in remaining_data)
                 slf_vector = []
                 for string in remaining_data:
@@ -113,12 +110,15 @@ class GraphTheoryDetector(detector):
                     df_vector, psi_vector, filtered_elements)
                 X_selected, X_selected_names = vet.rfe(
                     sele_vector, label, unique_data)
-                feature = np.column_stack((X_selected, slf_vector))
+                slf_sparse = csr_matrix(slf_vector)
+                feature = hstack([X_selected, slf_sparse])
+                feature = feature.toarray()
+                print(feature.shape)
                 with open("filtered_elements.pickle", 'wb') as pickle_file:
                     pickle.dump(filtered_elements, pickle_file)
                 with open("X_selected_names.pickle", 'wb') as pickle_file:
                     pickle.dump(X_selected_names, pickle_file)
-                return np.array(feature), label[:, 0]
+                return np.array(feature), np.array(label[:,0].tolist())
             if self.trained == True:
                 return data
 

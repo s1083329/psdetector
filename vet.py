@@ -19,6 +19,7 @@ from sklearn import svm
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_validate
+from scipy.sparse import csr_matrix
 
 def df_se(data):
     c = collections.Counter([element for sublist in data for element in sublist])
@@ -51,31 +52,36 @@ def slf(strings,max_length):
     slf_arr=np.array(slf_arr)
     return slf_arr
 
-#psi
 def psi(remaining_data):
-    #psi
     # 收集所有出現在整個列表中的字串
     all_strings = list(set(element for sublist in remaining_data for element in sublist))
 
-    # 初始化 PSI 矩陣
-    psi_matrix = np.zeros((len(remaining_data), len(all_strings)), dtype=int)
-
     # 創建一個字串到索引的映射
     string_to_index = {string: index for index, string in enumerate(all_strings)}
-    idx=0
-    # 填充 PSI 矩陣
-    for i, row in enumerate(remaining_data):
+
+    # 初始化稀疏矩陣的數據
+    row_indices = []
+    col_indices = []
+    data = []
+
+    # 填充稀疏矩陣的數據
+    for I, row in enumerate(remaining_data):
         for string in row:
             if string in string_to_index:
                 j = string_to_index[string]
-                psi_matrix[i, j] = 1
-    psi_vector=np.array(psi_matrix)
-    return psi_vector
+                row_indices.append(I)
+                col_indices.append(j)
+                data.append(1)
+
+    # 創建稀疏矩陣
+    psi_matrix = csr_matrix((data, (row_indices, col_indices)), shape=(len(remaining_data), len(all_strings)))
+    return psi_matrix
 
 #dfrank
 def DFrank(vector,label):
     #yi
-    unique_categories, category_indices = np.unique(label[:,1], return_inverse=True)
+    column_as_str = np.array([str(x) for x in label[:, 1]])
+    unique_categories = np.unique(column_as_str)
     index_by_category = [np.where(label[:,1] == category)[0] for category in unique_categories]
     yi=[]
     for i in index_by_category:
@@ -118,6 +124,7 @@ def se(df_vector,psi_vector,filtered_elements):
     selected_indices = np.concatenate(selected_feature_indices)
     selected_names=np.concatenate(selected_features_names)
     # 從原始的 PSIVector 中選擇選擇的特徵
+    selected_indices = selected_indices.reshape(-1)
     selected_features = psi_vector[:, selected_indices]
     # selected_features 現在包含了每個類別中選擇的前 20000 個特徵
 
@@ -128,19 +135,20 @@ def se(df_vector,psi_vector,filtered_elements):
 def rfe(sele_vector,label,unique_data):
     #rfe
     # 加載數據集
-    traindata = np.array(sele_vector.tolist())
-    y = np.array(label.tolist())
+    traindata = sele_vector
+    y = np.array(label[:,0].tolist())
     traindata, y = shuffle(traindata, y, random_state=42)
     # 創建SVM模型
     svm_model = SVC(kernel='linear')
     # 訓練SVM模型   
-    svm_model.fit(traindata, y[:,0])
+    svm_model.fit(traindata, y)
     # 獲取特徵權重
-    feature_weights = svm_model.coef_[0]
+    feature_weights = svm_model.coef_[0].toarray().flatten() if hasattr(svm_model.coef_[0], "toarray") else svm_model.coef_[0]
 
     # 根據權重給特徵排序，選擇前 2000 個特徵
     num_selected_features = 2000
     selected_features_indices = np.argsort(np.abs(feature_weights))[::-1][:num_selected_features]
+    selected_features_indices = selected_features_indices.reshape(-1)
     # 選擇特徵
     X_selected = sele_vector[:, selected_features_indices]
     X_selected_names=unique_data[selected_features_indices]#RFE篩出的string
